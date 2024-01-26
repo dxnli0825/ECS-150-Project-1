@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #define CMDLINE_MAX 512
@@ -294,6 +295,31 @@ int check_redirection(char *token, int redir_to, char *cmd)
         return redir_to;
 }
 
+void sls_command() {
+    DIR *dir;
+    struct dirent *ent;
+
+    if ((dir = opendir(".")) != NULL) {
+        while ((ent = readdir(dir)) != NULL) {
+            char filename[259];
+            struct stat st;
+
+            // Get the full path of the file
+            snprintf(filename, sizeof(filename), "%s/%s", ".", ent->d_name);
+
+            // Get file information
+            if (stat(filename, &st) == 0) {
+                printf("%s (%ld bytes)\n", ent->d_name, (long)st.st_size);
+            } else {
+                perror("Error getting file information");
+            }
+        }
+        closedir(dir);
+    } else {
+        perror("Error: cannot open directory");
+    }
+}
+
 int main(void)
 {
         char cmd[CMDLINE_MAX];
@@ -315,6 +341,7 @@ int main(void)
                 int redir = 0;
                 int use_pipe = 0;
                 int len = 0;
+                int is_sls = 0;
 
                 token = strtok(cmd, ">");
                 if (strcmp(token, original_cmd))
@@ -325,6 +352,10 @@ int main(void)
                 } else if (strcmp(strtok(cmd, "|"), original_cmd))
                 {
                         use_pipe = 1;
+                } else if (strstr(original_cmd, "sls"))
+                {
+                        sls_command();
+                        is_sls = 1;
                 } else
                 {
                         len = str_to_arr(cmd, argv, " ");
@@ -335,7 +366,7 @@ int main(void)
                         /* Child */
                         lenth_check(len);
 
-                        if (use_pipe == 1)
+                        if (use_pipe == 1 || is_sls == 1)
                         {
                                 exit(0);        //run pipe in different child
                         } else if (redir >= 1) 
