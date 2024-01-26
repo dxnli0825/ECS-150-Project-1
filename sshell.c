@@ -368,7 +368,7 @@ int main(void)
                         {
                                 char cwd[PATHLEN_MAX];
                                 getcwd(cwd, PATHLEN_MAX);
-                                printf("%s \n", cwd);
+                                fprintf(stdout, "%s \n", cwd);
                         } else if (!strcmp(argv[0], "cd") && argv[1] != NULL)
                         {
                                 status = cd_function(argv[1]);
