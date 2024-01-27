@@ -71,44 +71,45 @@ void file_redir(char *filename, int redir)
         remove_space(filename);
         
         if (redir ==1)
-        {
+        {       // command used >
                 fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
         } else 
-        {
+        {       //command used >>
                 fd = open(filename, O_RDWR | O_CREAT | O_APPEND, 0644);
         }
 
         if (fd < 0)
-        {
+        {       //file fail to open
                 fprintf(stderr, "Error: cannot write to the file\n");
                 exit(1);
         }
-        dup2(fd, STDOUT_FILENO);
+        dup2(fd, STDOUT_FILENO);        //change the directory
         close(fd);
 }
 
 void pipeline3(char *command1, char *command2, char *command3, char *original_cmd)
 {
-        pid_t p1, p2, p3;
-        int fd1[2];
-        int fd2[2];
-        int status1, status2, status3;
-        status1 = 0;
+        pid_t p1, p2, p3;       //fork
+        int fd1[2];     //pipe line 1
+        int fd2[2];     //pipe line 2
+        int status1, status2, status3;  //check which command did not pass
+        status1 = 0;    //set all command to true, update later
         status2 = 0;
         status3 = 0;
-        char *argv[CMDARGU_MAX];
+        char *argv[CMDARGU_MAX];        //arguments array
         pipe(fd1);
         pipe(fd2);
 
         p1 = fork();
         if(p1 < 0)
-        {
+        {       //fail to fork
                 exit(1);
         }
-        if (p1 == 0) { 
+        if (p1 == 0) 
+        {       //child 1 
                 str_to_arr(command1, argv, " ");
 
-                dup2(fd1[1], STDOUT_FILENO); 
+                dup2(fd1[1], STDOUT_FILENO);    //replace stdout with pipe 1 writing
                 
                 close(fd2[0]);
                 close(fd2[1]);
@@ -116,7 +117,6 @@ void pipeline3(char *command1, char *command2, char *command3, char *original_cm
                 close(fd1[1]);
 
                 execvp(argv[0], argv);
-                fprintf(stderr, "Error: command not found\n");
                 status1 =1;
                 exit(1);
         }
@@ -126,18 +126,20 @@ void pipeline3(char *command1, char *command2, char *command3, char *original_cm
         {
                 exit(1);
         }
-        if (p2 == 0) { // Child #2 
+        if (p2 == 0) 
+        {       // Child #2 
                 str_to_arr(command2, argv, " ");
                 
-                dup2(fd1[0], STDIN_FILENO); // Replace stdin with pipe 
-                dup2(fd2[1], STDOUT_FILENO);
+                dup2(fd1[0], STDIN_FILENO);     //Replace stdin with pipe 1 reading
+                dup2(fd2[1], STDOUT_FILENO);    //replace stdout with pipe 2 writing
 
+                // Close now unused FD 
                 close(fd1[1]);
                 close(fd2[0]);
                 close(fd2[1]);
-                close(fd1[0]); // Close now unused FD 
+                close(fd1[0]);
+
                 execvp(argv[0], argv); // Child #2 becomes command2 
-                fprintf(stderr, "Error: command not found\n");
                 status2 = 1;
                 exit(1);
         }
@@ -147,18 +149,19 @@ void pipeline3(char *command1, char *command2, char *command3, char *original_cm
         {
                 exit(1);
         }
-        if (p3 == 0) { // Child #3 
+        if (p3 == 0) 
+        { // Child #3 
                 str_to_arr(command3, argv, " ");
 
-                dup2(fd2[0], STDIN_FILENO); // Replace stdin with pipe 
+                dup2(fd2[0], STDIN_FILENO); // Replace stdin with pipe 2 reading
 
-                close(fd1[1]); // No need for write access 
+                //close unused file
+                close(fd1[1]);
                 close(fd1[0]);
                 close(fd2[1]);
-                close(fd2[0]); // Close now unused FD 
+                close(fd2[0]);
 
                 execvp(argv[0], argv); // Child #2 becomes command2 
-                fprintf(stderr, "Error: command not found\n");
                 status3 = 1;
                 exit(1);
         }
@@ -167,7 +170,7 @@ void pipeline3(char *command1, char *command2, char *command3, char *original_cm
         close(fd1[1]);
         close(fd2[0]);
         close(fd2[1]);
-        waitpid(p1, NULL, 0); // Parent waits for two children 
+        waitpid(p1, NULL, 0); // Parent waits for childrens
         waitpid(p2, NULL, 0);
         waitpid(p3, NULL, 0);
 
@@ -176,8 +179,8 @@ void pipeline3(char *command1, char *command2, char *command3, char *original_cm
 
 void pipeline2(char *command1, char *command2, char *original_cmd)
 {
-        pid_t p1, p2;
-        int fd[2];
+        pid_t p1, p2;   //fork
+        int fd[2];      //pipe line
         int status1, status2;
         status1 = 0;
         status2 = 0;
@@ -186,17 +189,20 @@ void pipeline2(char *command1, char *command2, char *original_cmd)
 
         p1 = fork();
         if(p1 < 0)
-        {
+        {       //fail to fork
                 exit(1);
         }
-        if (!(p1)) { // Child #1 
+        if (!(p1)) 
+        { // Child #1 
                 str_to_arr(command1, argv, " ");
-                close(fd[0]); // No need for read access
+                
                 dup2(fd[1], STDOUT_FILENO); // Replace stdout with pipe
+
+                close(fd[0]); // No need for read access
                 close(fd[1]); // Close now unused FD
+
                 execvp(argv[0], argv); // Child #1 becomes command1
-                fprintf(stderr, "Error: command not found\n");
-                status1 =1;
+                status1 = 1;
                 exit(1);
         }
 
@@ -205,21 +211,29 @@ void pipeline2(char *command1, char *command2, char *original_cmd)
         {
                 exit(1);
         }
-        if (!(p2)) { 
+        if (!(p2)) 
+        {       //chile 2 
                 str_to_arr(command2, argv, " ");
-                close(fd[1]); 
+                
                 dup2(fd[0], STDIN_FILENO);
+
+                close(fd[1]); 
                 close(fd[0]); 
+
                 execvp(argv[0], argv);
-                fprintf(stderr, "Error: command not found\n");
                 status2 = 1;
                 exit(1);
         }
 
-        close(fd[0]); 
+        close(fd[0]);   //close unused file
         close(fd[1]);
-        waitpid(p1, NULL, 0);
+        waitpid(p1, NULL, 0);   //wait 2 children
         waitpid(p2, NULL, 0);
+
+        if (WIFEXITED(status1)) {
+                // Child process p1 exited normally
+                status1 = WEXITSTATUS(status1); // Extract the exit status
+        }
 
         fprintf(stderr, "+ completed '%s' [%d] [%d]\n", original_cmd, status1, status2);
 }
@@ -229,13 +243,13 @@ int cd_function(char *argv)
         int status = 0;
         char cwd[PATHLEN_MAX];
 
-        DIR *dir = opendir(argv);
-        if ( dir == NULL)
-        {
+        DIR *dir = opendir(argv);       //check if command is directory
+        if ( dir == NULL && !strstr(argv, ".."))
+        {       //file is a directory
                 fprintf(stderr, "Error: cannot cd into directory\n");
                 status = RUN_FAIL;
         } else
-        {
+        {       //change directory
                 chdir(argv);
                 getcwd(cwd, PATHLEN_MAX);
         }
@@ -245,15 +259,15 @@ int cd_function(char *argv)
 void piping(char *cmd)
 {
         char *argv[CMDARGU_MAX];
-        int pipe_count = str_to_arr(cmd, argv, "|");
+        int pipe_count = str_to_arr(cmd, argv, "|");    //split base on |
         if (pipe_count == 1)
         {
                 fprintf(stderr, "Error: missing command\n");
         } else if(pipe_count == 2)
-        {
+        {       // needed 1 pipe line
                 pipeline2(argv[0], argv[1], cmd);
         } else
-        {
+        {       //needed 2 pipe line
                 pipeline3(argv[0], argv[1], argv[2], cmd);
         }
 }
@@ -284,7 +298,7 @@ void error_checking(int argument_len, char *filename)
         if(strchr(filename, '|') != NULL)
         {
                 fprintf(stderr, "Error: mislocated output redirection\n");
-                exit(ERROR);
+                exit(ERROR);    
         }
 }
 
@@ -395,7 +409,7 @@ int main(void)
                                 error_checking(argu_len, filename);
                                 file_redir(filename, redir);
 
-                        } else if(!strcmp(argv[0], "pwd") || (!strcmp(argv[0], "cd") && argv[1] != NULL))
+                        } else if(!strcmp(argv[0], "pwd") || (!strcmp(argv[0], "cd")))
                         {       //run cd and pwd on parent
                                 exit(0);
                         }
@@ -404,14 +418,14 @@ int main(void)
                         exit(ERROR);
 
                 } else if (pid > 0) {
-                        /* Parent */ 
+                        /* Parent */
                         int status;
                         wait(&status);
 
                         if(use_pipe == 1)
                         {
                                 piping(original_cmd);
-                                status = ERROR;
+                                break;
                         } else if(!strcmp(argv[0], "pwd") )
                         {
                                 char cwd[PATHLEN_MAX];
@@ -419,10 +433,11 @@ int main(void)
                                 fprintf(stdout, "%s \n", cwd);
                         } else if (!strcmp(argv[0], "cd") && argv[1] != NULL)
                         {
+                                printf("argv 1 = %s\n", argv[1]);
                                 status = cd_function(argv[1]);
                         }
 
-                        if (WIFEXITED(status) && (WEXITSTATUS(status) != ERROR) && use_pipe == 1) 
+                        if (WIFEXITED(status) && (WEXITSTATUS(status) != ERROR) && use_pipe == 0) 
                         {
                                 fprintf(stderr, "+ completed '%s' [%d]\n", original_cmd, WEXITSTATUS(status));
                         }
